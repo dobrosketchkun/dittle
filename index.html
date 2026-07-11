@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dittle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --felt: #2f4a3a;
+      --felt-deep: #243a2e;
+      --wood-dark: #3a2416;
+      --wood-mid: #5c3a24;
+      --wood-light: #7a5234;
+      --wood-grain: #2a1810;
+      --cell: #2e1c12;
+      --cell-rim: #6b4428;
+      --cream: #f3ebe0;
+      --muted: #c4b5a4;
+      --black-die: #1a1a1a;
+      --white-die: #f7f4ef;
+      --accent: #c9a66b;
+      --legal: #7ec8a0;
+      --selected: #e2b857;
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      font-family: "Source Sans 3", sans-serif;
+      color: var(--cream);
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, #3d5c48 0%, transparent 70%),
+        linear-gradient(160deg, #355544 0%, var(--felt-deep) 45%, #1c2e24 100%);
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 42rem);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .hud {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: end;
+      gap: 0.75rem;
+    }
+
+    .score { display: flex; flex-direction: column; gap: 0.15rem; }
+    .score--white { align-items: flex-start; }
+    .score--black { align-items: flex-end; text-align: right; }
+
+    .score__label {
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .score__value {
+      font-family: "Fraunces", serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score__meta { font-size: 0.8rem; color: var(--muted); }
+
+    .turn { text-align: center; padding-bottom: 0.15rem; }
+
+    .turn__label {
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .turn__player {
+      font-family: "Fraunces", serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .swatch {
+      width: 0.85rem;
+      height: 0.85rem;
+      border-radius: 2px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    }
+    .swatch--black { background: var(--black-die); }
+    .swatch--white {
+      background: var(--white-die);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+    }
+
+    .board-wrap {
+      width: 100%;
+      aspect-ratio: 1;
+      max-width: 36rem;
+      position: relative;
+      padding: 1.35rem 1.35rem 1.35rem 2.6rem;
+      border-radius: 0.55rem;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.07), transparent 40%),
+        repeating-linear-gradient(
+          92deg,
+          var(--wood-mid) 0px, var(--wood-dark) 3px,
+          var(--wood-mid) 7px, var(--wood-light) 10px,
+          var(--wood-dark) 14px
+        );
+      box-shadow:
+        0 1.5rem 3rem var(--shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand {
+      position: absolute;
+      left: 0.35rem;
+      top: 50%;
+      writing-mode: vertical-rl;
+      transform: translateY(-50%) rotate(180deg);
+      font-family: "Fraunces", serif;
+      font-weight: 700;
+      font-size: clamp(1.1rem, 3.5vw, 1.55rem);
+      letter-spacing: 0.35em;
+      color: rgba(243, 235, 224, 0.22);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .board {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: repeat(7, 1fr);
+      gap: 0.35rem;
+      padding: 0.45rem;
+      border-radius: 0.35rem;
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 30%),
+        var(--wood-grain);
+      box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+    }
+
+    .cell {
+      position: relative;
+      border-radius: 0.28rem;
+      background: linear-gradient(160deg, #3d2818 0%, var(--cell) 55%, #24160e 100%);
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px var(--cell-rim);
+      display: grid;
+      place-items: center;
+      cursor: default;
+      transition: box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .cell--base-black {
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px var(--cell-rim),
+        inset 0 0 0 2px rgba(201, 166, 107, 0.12);
+    }
+
+    .cell--base-white {
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px var(--cell-rim),
+        inset 0 0 0 2px rgba(243, 235, 224, 0.1);
+    }
+
+    .cell--selectable { cursor: pointer; }
+    .cell--selectable:hover .die { transform: scale(1.06); }
+
+    .cell--selected {
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.55),
+        0 0 0 2px var(--selected),
+        inset 0 0 12px rgba(226, 184, 87, 0.2);
+    }
+
+    .cell--legal {
+      cursor: pointer;
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        0 0 0 2px var(--legal),
+        inset 0 0 14px rgba(126, 200, 160, 0.22);
+    }
+
+    .cell--legal:hover .die--ghost {
+      opacity: 0.92;
+      transform: scale(1.06);
+    }
+
+    .die--ghost {
+      opacity: 0.62;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .die--ghost.die--black {
+      box-shadow:
+        0 0 0 1px rgba(126, 200, 160, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .die--ghost.die--white {
+      box-shadow:
+        0 0 0 1px rgba(126, 200, 160, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .die {
+      width: 82%;
+      aspect-ratio: 1;
+      border-radius: 14%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      padding: 14%;
+      position: relative;
+      transition: transform 0.18s ease;
+      z-index: 1;
+    }
+
+    .die--black {
+      background: linear-gradient(145deg, #2c2c2c, var(--black-die) 45%, #0d0d0d);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .die--white {
+      background: linear-gradient(145deg, #ffffff, var(--white-die) 50%, #e8e2d8);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .die--moving {
+      animation: dieHop 0.32s ease;
+    }
+
+    .die--tilting {
+      animation: dieTilt 0.32s ease;
+    }
+
+    @keyframes dieHop {
+      0% { transform: translate(0, 0) scale(1); }
+      40% { transform: translate(var(--dx, 0), var(--dy, 0)) scale(1.12); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
+    @keyframes dieTilt {
+      0% { transform: rotate(0deg) scale(1); }
+      40% { transform: rotate(var(--tilt, 8deg)) scale(1.05); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+
+    .pip {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      align-self: center;
+      justify-self: center;
+      transform: scale(0.72);
+    }
+
+    .die--black .pip {
+      background: radial-gradient(circle at 35% 30%, #fff, #e8e8e8 60%, #cfcfcf);
+    }
+
+    .die--white .pip {
+      background: radial-gradient(circle at 35% 30%, #333, #1a1a1a 70%, #0a0a0a);
+    }
+
+    .pip[data-pos="1"] { grid-area: 1 / 1; }
+    .pip[data-pos="2"] { grid-area: 1 / 2; }
+    .pip[data-pos="3"] { grid-area: 1 / 3; }
+    .pip[data-pos="4"] { grid-area: 2 / 1; }
+    .pip[data-pos="5"] { grid-area: 2 / 2; }
+    .pip[data-pos="6"] { grid-area: 2 / 3; }
+    .pip[data-pos="7"] { grid-area: 3 / 1; }
+    .pip[data-pos="8"] { grid-area: 3 / 2; }
+    .pip[data-pos="9"] { grid-area: 3 / 3; }
+
+    .die__facing {
+      position: absolute;
+      border-radius: 1px;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .die--black .die__facing { background: #ddd; }
+    .die--white .die__facing { background: #222; }
+    .die__facing--E { right: 6%; top: 50%; transform: translateY(-50%); width: 10%; height: 22%; }
+    .die__facing--W { left: 6%; top: 50%; transform: translateY(-50%); width: 10%; height: 22%; }
+    .die__facing--N { top: 6%; left: 50%; transform: translateX(-50%); width: 22%; height: 10%; }
+    .die__facing--S { bottom: 6%; left: 50%; transform: translateX(-50%); width: 22%; height: 10%; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+
+    .btn {
+      font-family: "Source Sans 3", sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--cream);
+      background: rgba(26, 18, 12, 0.35);
+      border: 1px solid rgba(201, 166, 107, 0.35);
+      padding: 0.45rem 0.9rem;
+      border-radius: 0.3rem;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn:hover {
+      background: rgba(26, 18, 12, 0.55);
+      border-color: var(--accent);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .net {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      align-items: stretch;
+    }
+
+    .net__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .net__status {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .net__status[data-tone="ok"] { color: var(--legal); }
+    .net__status[data-tone="wait"] { color: var(--accent); }
+    .net__status[data-tone="bad"] { color: #e08a7a; }
+
+    .net__invite {
+      display: none;
+      width: 100%;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    .net__invite.is-visible {
+      display: flex;
+    }
+
+    .net__url {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.75rem;
+      color: var(--cream);
+      background: rgba(26, 18, 12, 0.4);
+      border: 1px solid rgba(201, 166, 107, 0.3);
+      border-radius: 0.3rem;
+      padding: 0.45rem 0.6rem;
+      font-family: "Source Sans 3", sans-serif;
+    }
+
+    .you-are {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: none;
+      align-items: center;
+      gap: 0.35rem;
+      justify-content: center;
+    }
+
+    .you-are.is-visible { display: inline-flex; }
+
+    .hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: 30rem;
+      line-height: 1.4;
+      min-height: 2.5em;
+    }
+
+    .hint strong { color: var(--accent); font-weight: 600; }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(12, 20, 16, 0.72);
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .overlay.is-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .overlay__card {
+      width: min(100%, 22rem);
+      padding: 1.75rem 1.5rem;
+      border-radius: 0.5rem;
+      background:
+        linear-gradient(160deg, #5c3a24, #3a2416);
+      box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45);
+      text-align: center;
+      transform: translateY(0.5rem);
+      transition: transform 0.25s ease;
+    }
+
+    .overlay.is-open .overlay__card { transform: translateY(0); }
+
+    .overlay__title {
+      font-family: "Fraunces", serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .overlay__body {
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.45;
+    }
+
+    .overlay__scores {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .overlay__scores div {
+      padding: 0.65rem;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 0.3rem;
+    }
+
+    .overlay__scores strong {
+      display: block;
+      font-family: "Fraunces", serif;
+      font-size: 1.5rem;
+      color: var(--cream);
+    }
+
+    @media (max-width: 480px) {
+      .board-wrap { padding: 0.9rem 0.9rem 0.9rem 1.7rem; }
+      .board { gap: 0.22rem; padding: 0.3rem; }
+      .hud { gap: 0.4rem; }
+      .score__value { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="net" id="net">
+      <div class="net__row">
+        <button type="button" class="btn" id="btn-hotseat">Hotseat</button>
+        <button type="button" class="btn" id="btn-invite">Invite friend</button>
+        <span class="you-are" id="you-are"></span>
+      </div>
+      <div class="net__invite" id="invite-row">
+        <input class="net__url" id="invite-url" readonly aria-label="Invite link" />
+        <button type="button" class="btn" id="btn-copy">Copy link</button>
+      </div>
+      <p class="net__status" id="net-status" data-tone="wait"></p>
+    </div>
+
+    <header class="hud">
+      <div class="score score--white">
+        <span class="score__label">White score</span>
+        <span class="score__value" id="score-white">0</span>
+        <span class="score__meta" id="count-white">0 / 7 in black’s row</span>
+      </div>
+      <div class="turn">
+        <div class="turn__label">Turn</div>
+        <div class="turn__player" id="turn-display">
+          <span class="swatch swatch--black" aria-hidden="true"></span>
+          Black
+        </div>
+      </div>
+      <div class="score score--black">
+        <span class="score__label">Black score</span>
+        <span class="score__value" id="score-black">0</span>
+        <span class="score__meta" id="count-black">0 / 7 in white’s row</span>
+      </div>
+    </header>
+
+    <div class="board-wrap" aria-label="Dittle board">
+      <div class="brand">DITTLE</div>
+      <div class="board" id="board" role="grid" aria-rowcount="7" aria-colcount="7"></div>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" class="btn" id="btn-undo" disabled>Undo</button>
+      <button type="button" class="btn" id="btn-restart">Restart</button>
+    </div>
+
+    <p class="hint" id="hint">
+      Hotseat — select a die, then a highlighted square.
+      <strong>Tilt</strong> changes the top face; <strong>jumps</strong> keep it.
+    </p>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="overlay__card" role="dialog" aria-labelledby="overlay-title">
+      <h2 class="overlay__title" id="overlay-title">Game over</h2>
+      <p class="overlay__body" id="overlay-body"></p>
+      <div class="overlay__scores">
+        <div>
+          <span class="score__label">Black</span>
+          <strong id="final-black">0</strong>
+        </div>
+        <div>
+          <span class="score__label">White</span>
+          <strong id="final-white">0</strong>
+        </div>
+      </div>
+      <button type="button" class="btn" id="btn-play-again">Play again</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script>
+    const SIZE = 7;
+    const APP = "dittle";
+    const PROTOCOL = 1;
+    const iceServers = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      // VPN / stubborn NAT — add a TURN server here if needed.
+    ];
+    const BLACK_BASE_COL = 0;
+    const WHITE_BASE_COL = SIZE - 1;
+    const DIRS = {
+      N: { dr: -1, dc: 0 },
+      E: { dr: 0, dc: 1 },
+      S: { dr: 1, dc: 0 },
+      W: { dr: 0, dc: -1 },
+    };
+    const OPP = { N: "S", E: "W", S: "N", W: "E" };
+
+    const PIPS = {
+      1: [5],
+      2: [1, 9],
+      3: [1, 5, 9],
+      4: [1, 3, 7, 9],
+      5: [1, 3, 5, 7, 9],
+      6: [1, 3, 4, 6, 7, 9],
+    };
+
+    /** 6 up, 4 toward opponent (E for black / W for white), 3 toward own side. */
+    function initialOrientation(color) {
+      if (color === "black") {
+        return { top: 6, N: 2, E: 4, S: 5, W: 3 };
+      }
+      return { top: 6, N: 5, E: 3, S: 2, W: 4 };
+    }
+
+    function cloneOrient(o) {
+      return { top: o.top, N: o.N, E: o.E, S: o.S, W: o.W };
+    }
+
+    function tiltOrient(orient, dir) {
+      const o = cloneOrient(orient);
+      const bottom = 7 - o.top;
+      if (dir === "N") {
+        return { top: o.N, N: bottom, E: o.E, S: o.top, W: o.W };
+      }
+      if (dir === "E") {
+        return { top: o.E, N: o.N, E: bottom, S: o.S, W: o.top };
+      }
+      if (dir === "S") {
+        return { top: o.S, N: o.top, E: o.E, S: bottom, W: o.W };
+      }
+      if (dir === "W") {
+        return { top: o.W, N: o.N, E: o.top, S: o.S, W: bottom };
+      }
+      return o;
+    }
+
+    function forwardDir(color) {
+      return color === "black" ? "E" : "W";
+    }
+
+    function isBackward(color, dir) {
+      return dir === OPP[forwardDir(color)];
+    }
+
+    function legalDirs(color) {
+      return Object.keys(DIRS).filter((d) => !isBackward(color, d));
+    }
+
+    function inBounds(row, col) {
+      return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
+    }
+
+    function createInitialState() {
+      const dice = [];
+      for (let row = 0; row < SIZE; row++) {
+        dice.push({
+          id: `b${row}`,
+          color: "black",
+          row,
+          col: BLACK_BASE_COL,
+          orient: initialOrientation("black"),
+        });
+        dice.push({
+          id: `w${row}`,
+          color: "white",
+          row,
+          col: WHITE_BASE_COL,
+          orient: initialOrientation("white"),
+        });
+      }
+      return {
+        dice,
+        turn: "black",
+        status: "playing",
+        winner: null,
+        scores: { black: 0, white: 0 },
+      };
+    }
+
+    function cloneState(state) {
+      return {
+        dice: state.dice.map((d) => ({
+          ...d,
+          orient: cloneOrient(d.orient),
+        })),
+        turn: state.turn,
+        status: state.status,
+        winner: state.winner,
+        scores: { ...state.scores },
+      };
+    }
+
+    function dieAt(state, row, col) {
+      return state.dice.find((d) => d.row === row && d.col === col) || null;
+    }
+
+    function dieById(state, id) {
+      return state.dice.find((d) => d.id === id) || null;
+    }
+
+    function opponentBase(color) {
+      return color === "black" ? WHITE_BASE_COL : BLACK_BASE_COL;
+    }
+
+    function scoreInOpponentBase(state, color) {
+      const base = opponentBase(color);
+      return state.dice
+        .filter((d) => d.color === color && d.col === base)
+        .reduce((sum, d) => sum + d.orient.top, 0);
+    }
+
+    function countInOpponentBase(state, color) {
+      const base = opponentBase(color);
+      return state.dice.filter((d) => d.color === color && d.col === base).length;
+    }
+
+    function allInOpponentBase(state, color) {
+      return countInOpponentBase(state, color) === 7;
+    }
+
+    /** Path cells before landing must be DIE (EMPTY DIE)* */
+    function isValidJumpPath(pathCells, state) {
+      if (pathCells.length < 1 || pathCells.length % 2 === 0) return false;
+      for (let i = 0; i < pathCells.length; i++) {
+        const { row, col } = pathCells[i];
+        const occupied = !!dieAt(state, row, col);
+        if (i % 2 === 0) {
+          if (!occupied) return false;
+        } else if (occupied) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function jumpLandingsFrom(state, row, col, dir) {
+      const { dr, dc } = DIRS[dir];
+      const cells = [];
+      let r = row + dr;
+      let c = col + dc;
+      while (inBounds(r, c)) {
+        cells.push({ row: r, col: c });
+        r += dr;
+        c += dc;
+      }
+
+      const lands = [];
+      for (let i = 0; i < cells.length; i++) {
+        const land = cells[i];
+        if (dieAt(state, land.row, land.col)) continue;
+        const path = cells.slice(0, i);
+        if (!isValidJumpPath(path, state)) continue;
+        lands.push({
+          row: land.row,
+          col: land.col,
+          dir,
+          over: path.filter((_, idx) => idx % 2 === 0).length,
+        });
+      }
+      return lands;
+    }
+
+    /**
+     * All jump sequences from (row,col), including multi-jump / L-shapes.
+     * Moving die’s square is treated as vacant. Orientation unchanged.
+     */
+    function collectJumpSequences(state, color, row, col) {
+      const results = [];
+      const seenEnds = new Set();
+      const key = (r, c) => `${r},${c}`;
+
+      const ghost = cloneState(state);
+      const moving = dieAt(ghost, row, col);
+      if (moving) {
+        moving.row = -1;
+        moving.col = -1;
+      }
+
+      function continueJump(r, c, jumps, vis) {
+        for (const d of legalDirs(color)) {
+          for (const land of jumpLandingsFrom(ghost, r, c, d)) {
+            const k = key(land.row, land.col);
+            if (vis.has(k)) continue;
+            const nextJumps = [...jumps, { dir: d, row: land.row, col: land.col }];
+            const endKey =
+              k + "|" + nextJumps.map((j) => `${j.dir}${j.row},${j.col}`).join(";");
+            if (!seenEnds.has(endKey)) {
+              seenEnds.add(endKey);
+              results.push({ row: land.row, col: land.col, jumps: nextJumps });
+            }
+            const nextVis = new Set(vis);
+            nextVis.add(k);
+            continueJump(land.row, land.col, nextJumps, nextVis);
+          }
+        }
+      }
+
+      continueJump(row, col, [], new Set([key(row, col)]));
+      return results;
+    }
+
+    function moveKey(move) {
+      return [
+        move.dieId,
+        move.tilt || "-",
+        (move.jumps || []).map((j) => `${j.dir}${j.row}${j.col}`).join(","),
+        move.toRow,
+        move.toCol,
+      ].join("|");
+    }
+
+    function preferMove(a, b) {
+      // Prefer higher final top, then fewer jumps, then pure jump over tilt+jump
+      if (b.finalTop !== a.finalTop) return b.finalTop - a.finalTop;
+      const aj = (a.jumps || []).length;
+      const bj = (b.jumps || []).length;
+      if (aj !== bj) return aj - bj;
+      const at = a.tilt ? 1 : 0;
+      const bt = b.tilt ? 1 : 0;
+      return at - bt;
+    }
+
+    function legalMoves(state, color) {
+      if (state.status !== "playing") return [];
+      const moves = [];
+      const mine = state.dice.filter((d) => d.color === color);
+
+      for (const die of mine) {
+        // Pure tilts
+        for (const dir of legalDirs(color)) {
+          const nr = die.row + DIRS[dir].dr;
+          const nc = die.col + DIRS[dir].dc;
+          if (!inBounds(nr, nc)) continue;
+          if (dieAt(state, nr, nc)) continue;
+          const orient = tiltOrient(die.orient, dir);
+          moves.push({
+            dieId: die.id,
+            tilt: dir,
+            jumps: [],
+            toRow: nr,
+            toCol: nc,
+            finalTop: orient.top,
+            kind: "tilt",
+          });
+        }
+
+        // Pure jumps (incl. multi / L)
+        for (const seq of collectJumpSequences(state, color, die.row, die.col)) {
+          moves.push({
+            dieId: die.id,
+            tilt: null,
+            jumps: seq.jumps,
+            toRow: seq.row,
+            toCol: seq.col,
+            finalTop: die.orient.top,
+            kind: "jump",
+          });
+        }
+
+        // Tilt then jump(s)
+        for (const dir of legalDirs(color)) {
+          const nr = die.row + DIRS[dir].dr;
+          const nc = die.col + DIRS[dir].dc;
+          if (!inBounds(nr, nc)) continue;
+          if (dieAt(state, nr, nc)) continue;
+
+          const ghost = cloneState(state);
+          const gDie = dieById(ghost, die.id);
+          gDie.row = nr;
+          gDie.col = nc;
+          gDie.orient = tiltOrient(die.orient, dir);
+
+          for (const seq of collectJumpSequences(ghost, color, nr, nc)) {
+            moves.push({
+              dieId: die.id,
+              tilt: dir,
+              jumps: seq.jumps,
+              toRow: seq.row,
+              toCol: seq.col,
+              finalTop: gDie.orient.top,
+              kind: "tilt-jump",
+            });
+          }
+        }
+      }
+
+      // Dedupe identical move keys; if same end square+die with different paths, keep preferred
+      const byEnd = new Map();
+      for (const m of moves) {
+        const end = `${m.dieId}@${m.toRow},${m.toCol}`;
+        const prev = byEnd.get(end);
+        if (!prev || preferMove(m, prev) < 0) byEnd.set(end, m);
+      }
+      return [...byEnd.values()];
+    }
+
+    function applyMove(state, move) {
+      const next = cloneState(state);
+      const die = dieById(next, move.dieId);
+      if (!die || die.color !== next.turn) {
+        return { ok: false, error: "Wrong die", state };
+      }
+
+      const legal = legalMoves(state, state.turn);
+      const match = legal.find((m) => moveKey(m) === moveKey(move));
+      if (!match) {
+        // Allow applying by end-square identity from UI
+        const byEnd = legal.find(
+          (m) => m.dieId === move.dieId && m.toRow === move.toRow && m.toCol === move.toCol
+        );
+        if (!byEnd) return { ok: false, error: "Illegal move", state };
+        move = byEnd;
+      }
+
+      if (move.tilt) {
+        die.orient = tiltOrient(die.orient, move.tilt);
+        die.row += DIRS[move.tilt].dr;
+        die.col += DIRS[move.tilt].dc;
+      }
+
+      for (const jump of move.jumps || []) {
+        die.row = jump.row;
+        die.col = jump.col;
+      }
+
+      const blackDone = allInOpponentBase(next, "black");
+      const whiteDone = allInOpponentBase(next, "white");
+
+      if (blackDone || whiteDone) {
+        next.status = "over";
+        next.scores = {
+          black: scoreInOpponentBase(next, "black"),
+          white: scoreInOpponentBase(next, "white"),
+        };
+        if (next.scores.black > next.scores.white) next.winner = "black";
+        else if (next.scores.white > next.scores.black) next.winner = "white";
+        else next.winner = "tie";
+      } else {
+        next.turn = next.turn === "black" ? "white" : "black";
+        next.scores = {
+          black: scoreInOpponentBase(next, "black"),
+          white: scoreInOpponentBase(next, "white"),
+        };
+      }
+
+      return { ok: true, state: next, move };
+    }
+
+    // ——— UI + networking ———
+
+    let state = createInitialState();
+    let history = [];
+    let selectedId = null;
+    let animating = false;
+
+    /** @type {'hotseat' | 'online'} */
+    let mode = "hotseat";
+    /** @type {'host' | 'guest' | null} */
+    let role = null;
+    /** @type {'black' | 'white' | null} */
+    let myColor = null;
+    /** @type {'idle' | 'hosting' | 'connecting' | 'connected' | 'disconnected' | 'error'} */
+    let netStatus = "idle";
+    let peer = null;
+    let conn = null;
+    let turnIndex = 0;
+    let pendingGuestMove = false;
+
+    const boardEl = document.getElementById("board");
+    const hintEl = document.getElementById("hint");
+    const overlayEl = document.getElementById("overlay");
+    const btnUndo = document.getElementById("btn-undo");
+    const btnRestart = document.getElementById("btn-restart");
+    const btnPlayAgain = document.getElementById("btn-play-again");
+    const btnHotseat = document.getElementById("btn-hotseat");
+    const btnInvite = document.getElementById("btn-invite");
+    const btnCopy = document.getElementById("btn-copy");
+    const inviteRow = document.getElementById("invite-row");
+    const inviteUrlEl = document.getElementById("invite-url");
+    const netStatusEl = document.getElementById("net-status");
+    const youAreEl = document.getElementById("you-are");
+
+    function forwardFaceDir(color) {
+      return forwardDir(color);
+    }
+
+    function appendPips(el, top) {
+      for (const pos of PIPS[top]) {
+        const pip = document.createElement("span");
+        pip.className = "pip";
+        pip.dataset.pos = String(pos);
+        el.appendChild(pip);
+      }
+    }
+
+    function createDieElement(die) {
+      const el = document.createElement("div");
+      el.className = `die die--${die.color}`;
+      el.dataset.id = die.id;
+      el.setAttribute("role", "img");
+      el.setAttribute(
+        "aria-label",
+        `${die.color} die showing ${die.orient.top}`
+      );
+
+      appendPips(el, die.orient.top);
+
+      const faceDir = forwardFaceDir(die.color);
+      const facingMark = document.createElement("span");
+      facingMark.className = `die__facing die__facing--${faceDir}`;
+      facingMark.title = `${die.orient[faceDir]} faces ${faceDir}`;
+      el.appendChild(facingMark);
+
+      return el;
+    }
+
+    function createGhostDie(color, top, kind) {
+      const el = document.createElement("div");
+      el.className = `die die--${color} die--ghost`;
+      el.setAttribute("aria-hidden", "true");
+      el.title =
+        kind === "jump"
+          ? `Land showing ${top} (jump keeps face)`
+          : `Land showing ${top}`;
+      appendPips(el, top);
+      return el;
+    }
+
+    function isOnline() {
+      return mode === "online";
+    }
+
+    function canAct() {
+      if (state.status !== "playing" || animating) return false;
+      if (!isOnline()) return true;
+      if (netStatus !== "connected") return false;
+      if (pendingGuestMove) return false;
+      return state.turn === myColor;
+    }
+
+    function movesForSelection() {
+      if (!selectedId || !canAct()) return [];
+      return legalMoves(state, state.turn).filter((m) => m.dieId === selectedId);
+    }
+
+    function setNetStatus(text, tone = "wait") {
+      netStatusEl.textContent = text;
+      netStatusEl.dataset.tone = tone;
+    }
+
+    function updateYouAre() {
+      if (!isOnline() || !myColor) {
+        youAreEl.classList.remove("is-visible");
+        youAreEl.replaceChildren();
+        return;
+      }
+      youAreEl.classList.add("is-visible");
+      youAreEl.replaceChildren();
+      const swatch = document.createElement("span");
+      swatch.className = `swatch swatch--${myColor}`;
+      swatch.setAttribute("aria-hidden", "true");
+      youAreEl.appendChild(swatch);
+      youAreEl.appendChild(
+        document.createTextNode(
+          `You are ${myColor === "black" ? "Black" : "White"}`
+        )
+      );
+    }
+
+    function updateModeButtons() {
+      btnHotseat.disabled = isOnline() && netStatus === "connected";
+      btnInvite.disabled =
+        isOnline() && (netStatus === "hosting" || netStatus === "connected" || netStatus === "connecting");
+      btnUndo.disabled =
+        isOnline() || history.length === 0 || animating || state.status === "over";
+      if (isOnline()) {
+        btnRestart.textContent = role === "host" ? "Restart" : "Request restart";
+        btnPlayAgain.textContent = role === "host" ? "Play again" : "Request restart";
+      } else {
+        btnRestart.textContent = "Restart";
+        btnPlayAgain.textContent = "Play again";
+      }
+    }
+
+    function renderBoard() {
+      const moves = movesForSelection();
+      const legalByCell = new Map(
+        moves.map((m) => [`${m.toRow},${m.toCol}`, m])
+      );
+      const selectedDie = selectedId ? dieById(state, selectedId) : null;
+      const selectable = new Set();
+      if (canAct()) {
+        for (const d of state.dice) {
+          if (d.color === state.turn) selectable.add(d.id);
+        }
+      }
+
+      boardEl.replaceChildren();
+
+      for (let row = 0; row < SIZE; row++) {
+        for (let col = 0; col < SIZE; col++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.row = String(row);
+          cell.dataset.col = String(col);
+          cell.setAttribute("role", "gridcell");
+
+          if (col === BLACK_BASE_COL) cell.classList.add("cell--base-black");
+          if (col === WHITE_BASE_COL) cell.classList.add("cell--base-white");
+
+          const die = dieAt(state, row, col);
+          if (die) {
+            cell.appendChild(createDieElement(die));
+            if (selectable.has(die.id)) cell.classList.add("cell--selectable");
+            if (die.id === selectedId) cell.classList.add("cell--selected");
+          }
+
+          const preview = legalByCell.get(`${row},${col}`);
+          if (preview && selectedDie) {
+            cell.classList.add("cell--legal");
+            cell.appendChild(
+              createGhostDie(selectedDie.color, preview.finalTop, preview.kind)
+            );
+            cell.setAttribute(
+              "aria-label",
+              `Move here, top face becomes ${preview.finalTop}`
+            );
+          }
+
+          cell.addEventListener("click", () => onCellClick(row, col));
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function renderHud() {
+      const blackScore = scoreInOpponentBase(state, "black");
+      const whiteScore = scoreInOpponentBase(state, "white");
+      const blackCount = countInOpponentBase(state, "black");
+      const whiteCount = countInOpponentBase(state, "white");
+
+      document.getElementById("score-black").textContent = String(blackScore);
+      document.getElementById("score-white").textContent = String(whiteScore);
+      document.getElementById("count-black").textContent =
+        `${blackCount} / 7 in white’s row`;
+      document.getElementById("count-white").textContent =
+        `${whiteCount} / 7 in black’s row`;
+
+      const turnEl = document.getElementById("turn-display");
+      turnEl.replaceChildren();
+      if (state.status === "over") {
+        turnEl.appendChild(document.createTextNode("Game over"));
+      } else {
+        const swatch = document.createElement("span");
+        swatch.className = `swatch swatch--${state.turn}`;
+        swatch.setAttribute("aria-hidden", "true");
+        turnEl.appendChild(swatch);
+        turnEl.appendChild(
+          document.createTextNode(state.turn === "black" ? "Black" : "White")
+        );
+      }
+
+      updateYouAre();
+      updateModeButtons();
+    }
+
+    function updateHint() {
+      if (isOnline() && netStatus !== "connected") {
+        if (netStatus === "hosting") {
+          hintEl.innerHTML =
+            "Waiting for a friend to open your invite link. Keep this tab open.";
+          return;
+        }
+        if (netStatus === "connecting") {
+          hintEl.innerHTML = "Connecting to host…";
+          return;
+        }
+        if (netStatus === "disconnected" || netStatus === "error") {
+          hintEl.innerHTML =
+            "Connection lost. Create a new invite or reopen the join link.";
+          return;
+        }
+      }
+
+      if (state.status === "over") {
+        hintEl.innerHTML = "Game over — see results.";
+        return;
+      }
+
+      if (isOnline() && pendingGuestMove) {
+        hintEl.innerHTML = "Sending move…";
+        return;
+      }
+
+      if (isOnline() && !canAct()) {
+        hintEl.innerHTML = `Online — waiting for <strong>${
+          state.turn === "black" ? "Black" : "White"
+        }</strong>.`;
+        return;
+      }
+
+      const who = isOnline()
+        ? `You (${myColor === "black" ? "Black" : "White"})`
+        : state.turn === "black"
+          ? "Black"
+          : "White";
+
+      if (!selectedId) {
+        hintEl.innerHTML = `${
+          isOnline() ? "Online" : "Hotseat"
+        } — <strong>${who}</strong>: select one of your dice.`;
+        return;
+      }
+      const n = movesForSelection().length;
+      hintEl.innerHTML =
+        n > 0
+          ? `Selected die — <strong>${n}</strong> destination${n === 1 ? "" : "s"}. Ghost dice show the <strong>top face</strong> after the move.`
+          : "No legal moves for this die — pick another.";
+    }
+
+    function showOverlay() {
+      const { scores, winner } = state;
+      document.getElementById("final-black").textContent = String(scores.black);
+      document.getElementById("final-white").textContent = String(scores.white);
+      let title = "Game over";
+      let body = "";
+      if (winner === "tie") {
+        title = "It’s a tie";
+        body = "Equal face-up totals in the opponent’s base rows.";
+      } else {
+        title = `${winner === "black" ? "Black" : "White"} wins`;
+        body =
+          "Highest sum of face-up dice in the opponent’s base row wins — finishing first is not enough.";
+      }
+      document.getElementById("overlay-title").textContent = title;
+      document.getElementById("overlay-body").textContent = body;
+      overlayEl.classList.add("is-open");
+      overlayEl.setAttribute("aria-hidden", "false");
+    }
+
+    function hideOverlay() {
+      overlayEl.classList.remove("is-open");
+      overlayEl.setAttribute("aria-hidden", "true");
+    }
+
+    function render() {
+      renderBoard();
+      renderHud();
+      updateHint();
+      if (state.status === "over") showOverlay();
+      else hideOverlay();
+    }
+
+    function onCellClick(row, col) {
+      if (!canAct()) return;
+
+      const die = dieAt(state, row, col);
+      const moves = movesForSelection();
+      const targetMove = moves.find((m) => m.toRow === row && m.toCol === col);
+
+      if (targetMove) {
+        playMove(targetMove);
+        return;
+      }
+
+      if (die && die.color === state.turn) {
+        selectedId = selectedId === die.id ? null : die.id;
+        render();
+        return;
+      }
+
+      selectedId = null;
+      render();
+    }
+
+    function serializeMove(move) {
+      return {
+        dieId: move.dieId,
+        tilt: move.tilt || null,
+        jumps: (move.jumps || []).map((j) => ({
+          dir: j.dir,
+          row: j.row,
+          col: j.col,
+        })),
+        toRow: move.toRow,
+        toCol: move.toCol,
+        kind: move.kind,
+        finalTop: move.finalTop,
+      };
+    }
+
+    function applyStateFromHost(nextState, lastMove) {
+      selectedId = null;
+      pendingGuestMove = false;
+      history = [];
+      const prev = cloneState(state);
+      state = cloneState(nextState);
+      turnIndex += 1;
+
+      if (lastMove) {
+        animating = true;
+        renderBoard();
+        renderHud();
+        updateHint();
+        const dieEl = boardEl.querySelector(`[data-id="${lastMove.dieId}"]`);
+        if (dieEl) {
+          const hasJump = (lastMove.jumps || []).length > 0;
+          dieEl.style.setProperty(
+            "--tilt",
+            lastMove.tilt === "E" || lastMove.tilt === "W" ? "10deg" : "-10deg"
+          );
+          dieEl.classList.add(hasJump ? "die--moving" : "die--tilting");
+        }
+        setTimeout(() => {
+          animating = false;
+          render();
+        }, 320);
+      } else {
+        animating = false;
+        render();
+      }
+      void prev;
+    }
+
+    function broadcastState(lastMove) {
+      if (!conn || !conn.open || role !== "host") return;
+      conn.send({
+        type: "state",
+        turn: turnIndex,
+        state: cloneState(state),
+        lastMove: lastMove ? serializeMove(lastMove) : null,
+      });
+    }
+
+    function commitLocalMove(move, { recordHistory }) {
+      const before = cloneState(state);
+      const result = applyMove(state, move);
+      if (!result.ok) return false;
+
+      if (recordHistory) history.push(before);
+      selectedId = null;
+      animating = true;
+      state = result.state;
+      turnIndex += 1;
+
+      renderBoard();
+      renderHud();
+      updateHint();
+
+      const dieEl = boardEl.querySelector(`[data-id="${move.dieId}"]`);
+      if (dieEl) {
+        const hasJump = (move.jumps || []).length > 0;
+        dieEl.style.setProperty(
+          "--tilt",
+          move.tilt === "E" || move.tilt === "W" ? "10deg" : "-10deg"
+        );
+        dieEl.classList.add(hasJump ? "die--moving" : "die--tilting");
+      }
+
+      setTimeout(() => {
+        animating = false;
+        render();
+      }, 320);
+
+      return true;
+    }
+
+    function playMove(move) {
+      if (!canAct()) return;
+
+      if (isOnline() && role === "guest") {
+        if (!conn || !conn.open) return;
+        pendingGuestMove = true;
+        selectedId = null;
+        updateHint();
+        updateModeButtons();
+        conn.send({ type: "move", turn: turnIndex, move: serializeMove(move) });
+        return;
+      }
+
+      const ok = commitLocalMove(move, { recordHistory: !isOnline() });
+      if (ok && isOnline() && role === "host") {
+        broadcastState(move);
+      }
+    }
+
+    function hostApplyGuestMove(move) {
+      if (role !== "host" || state.status !== "playing") return;
+      if (state.turn !== "white") {
+        conn?.send({ type: "error", message: "Not your turn" });
+        broadcastState(null);
+        return;
+      }
+      const result = applyMove(state, move);
+      if (!result.ok) {
+        conn?.send({ type: "error", message: result.error || "Illegal move" });
+        broadcastState(null);
+        return;
+      }
+      selectedId = null;
+      animating = true;
+      state = result.state;
+      turnIndex += 1;
+
+      renderBoard();
+      renderHud();
+      updateHint();
+
+      const dieEl = boardEl.querySelector(`[data-id="${move.dieId}"]`);
+      if (dieEl) {
+        const hasJump = (move.jumps || []).length > 0;
+        dieEl.style.setProperty(
+          "--tilt",
+          move.tilt === "E" || move.tilt === "W" ? "10deg" : "-10deg"
+        );
+        dieEl.classList.add(hasJump ? "die--moving" : "die--tilting");
+      }
+
+      broadcastState(move);
+
+      setTimeout(() => {
+        animating = false;
+        render();
+      }, 320);
+    }
+
+    function doRestart({ fromPeer } = {}) {
+      state = createInitialState();
+      history = [];
+      selectedId = null;
+      animating = false;
+      pendingGuestMove = false;
+      turnIndex = 0;
+      hideOverlay();
+      render();
+
+      if (isOnline() && role === "host" && conn?.open) {
+        conn.send({
+          type: "start",
+          youAre: "white",
+          first: "black",
+          state: cloneState(state),
+        });
+      }
+      void fromPeer;
+    }
+
+    function restart() {
+      if (isOnline()) {
+        if (role === "host") {
+          doRestart();
+          return;
+        }
+        if (conn?.open) {
+          conn.send({ type: "restart-request" });
+          setNetStatus("Restart requested…", "wait");
+        }
+        return;
+      }
+      doRestart();
+    }
+
+    function undo() {
+      if (isOnline() || !history.length || animating) return;
+      state = history.pop();
+      selectedId = null;
+      render();
+    }
+
+    function destroyPeer() {
+      try {
+        conn?.close();
+      } catch (_) {}
+      try {
+        peer?.destroy();
+      } catch (_) {}
+      conn = null;
+      peer = null;
+    }
+
+    function makePeer() {
+      return new Peer({ config: { iceServers } });
+    }
+
+    function inviteUrlFor(id) {
+      const url = new URL(location.href);
+      url.search = "";
+      url.hash = "";
+      url.searchParams.set("join", id);
+      return url.toString();
+    }
+
+    function wireConnection(connection, asRole) {
+      conn = connection;
+      role = asRole;
+
+      conn.on("open", () => {
+        netStatus = "connected";
+        setNetStatus("Connected", "ok");
+        inviteRow.classList.remove("is-visible");
+
+        if (asRole === "host") {
+          myColor = "black";
+          state = createInitialState();
+          turnIndex = 0;
+          history = [];
+          selectedId = null;
+          conn.send({ type: "hello", app: APP, version: PROTOCOL, role: "host" });
+          conn.send({
+            type: "start",
+            youAre: "white",
+            first: "black",
+            state: cloneState(state),
+          });
+          render();
+        } else {
+          myColor = "white";
+          conn.send({ type: "hello", app: APP, version: PROTOCOL, role: "guest" });
+        }
+        updateYouAre();
+        updateModeButtons();
+        updateHint();
+      });
+
+      conn.on("data", (data) => onNetMessage(data));
+
+      conn.on("close", () => {
+        netStatus = "disconnected";
+        pendingGuestMove = false;
+        setNetStatus("Disconnected — host or guest left.", "bad");
+        updateModeButtons();
+        updateHint();
+        renderBoard();
+      });
+
+      conn.on("error", (err) => {
+        netStatus = "error";
+        setNetStatus(`Connection error: ${err?.type || err?.message || err}`, "bad");
+        updateModeButtons();
+        updateHint();
+      });
+    }
+
+    function onNetMessage(data) {
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "hello") {
+        if (data.app && data.app !== APP) {
+          setNetStatus("Peer is not a Dittle client.", "bad");
+        }
+        return;
+      }
+
+      if (data.type === "start" && role === "guest") {
+        myColor = data.youAre || "white";
+        applyStateFromHost(data.state, null);
+        netStatus = "connected";
+        setNetStatus("Connected — you are White. Host is Black.", "ok");
+        updateYouAre();
+        return;
+      }
+
+      if (data.type === "state" && role === "guest") {
+        applyStateFromHost(data.state, data.lastMove);
+        setNetStatus("Connected", "ok");
+        return;
+      }
+
+      if (data.type === "move" && role === "host") {
+        hostApplyGuestMove(data.move);
+        return;
+      }
+
+      if (data.type === "restart-request" && role === "host") {
+        doRestart({ fromPeer: true });
+        setNetStatus("Connected — game restarted.", "ok");
+        return;
+      }
+
+      if (data.type === "error" && role === "guest") {
+        pendingGuestMove = false;
+        setNetStatus(data.message || "Move rejected", "bad");
+        render();
+      }
+    }
+
+    function startHosting() {
+      destroyPeer();
+      mode = "online";
+      role = "host";
+      myColor = "black";
+      netStatus = "hosting";
+      state = createInitialState();
+      history = [];
+      selectedId = null;
+      turnIndex = 0;
+      pendingGuestMove = false;
+      inviteRow.classList.add("is-visible");
+      inviteUrlEl.value = "Creating invite…";
+      setNetStatus("Creating invite…", "wait");
+      render();
+
+      peer = makePeer();
+      peer.on("open", (id) => {
+        const url = inviteUrlFor(id);
+        inviteUrlEl.value = url;
+        setNetStatus("Invite ready — share the link. Waiting for guest…", "wait");
+      });
+
+      peer.on("connection", (connection) => {
+        if (conn && conn.open) {
+          connection.close();
+          return;
+        }
+        wireConnection(connection, "host");
+      });
+
+      peer.on("error", (err) => {
+        netStatus = "error";
+        setNetStatus(`Peer error: ${err?.type || err?.message || err}`, "bad");
+        updateModeButtons();
+      });
+
+      updateModeButtons();
+    }
+
+    function startGuest(hostId) {
+      destroyPeer();
+      mode = "online";
+      role = "guest";
+      myColor = "white";
+      netStatus = "connecting";
+      pendingGuestMove = false;
+      inviteRow.classList.remove("is-visible");
+      setNetStatus(`Joining ${hostId}…`, "wait");
+      render();
+
+      peer = makePeer();
+      peer.on("open", () => {
+        const connection = peer.connect(hostId, { reliable: true });
+        wireConnection(connection, "guest");
+      });
+
+      peer.on("error", (err) => {
+        netStatus = "error";
+        setNetStatus(`Peer error: ${err?.type || err?.message || err}`, "bad");
+        updateModeButtons();
+      });
+
+      updateModeButtons();
+    }
+
+    function goHotseat() {
+      destroyPeer();
+      mode = "hotseat";
+      role = null;
+      myColor = null;
+      netStatus = "idle";
+      pendingGuestMove = false;
+      inviteRow.classList.remove("is-visible");
+      const url = new URL(location.href);
+      url.search = "";
+      window.history.replaceState(null, "", url.pathname + url.hash);
+      setNetStatus("");
+      doRestart();
+      updateYouAre();
+      updateModeButtons();
+    }
+
+    btnUndo.addEventListener("click", undo);
+    btnRestart.addEventListener("click", restart);
+    btnPlayAgain.addEventListener("click", restart);
+    btnHotseat.addEventListener("click", goHotseat);
+    btnInvite.addEventListener("click", startHosting);
+    btnCopy.addEventListener("click", async () => {
+      const text = inviteUrlEl.value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setNetStatus("Link copied — send it to your opponent.", "ok");
+      } catch (_) {
+        inviteUrlEl.select();
+        setNetStatus("Copy failed — select and copy the link manually.", "wait");
+      }
+    });
+
+    const joinId = new URLSearchParams(location.search).get("join");
+    if (joinId) {
+      startGuest(joinId);
+    } else {
+      setNetStatus("");
+      render();
+      updateModeButtons();
+    }
+
+    window.Dittle = {
+      getState: () => state,
+      legalMoves: () => legalMoves(state, state.turn),
+      applyMove,
+      createInitialState,
+      tiltOrient,
+      SIZE,
+      getNet: () => ({ mode, role, myColor, netStatus }),
+    };
+  </script>
+</body>
+</html>
