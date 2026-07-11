@@ -994,6 +994,8 @@
     let animating = false;
     let sessionWins = { black: 0, white: 0 };
     let aiTimer = null;
+    /** Recent AI landings — used to break oscillation loops. */
+    let aiRecentKeys = [];
 
     /** @type {'hotseat' | 'online' | 'ai'} */
     let mode = "hotseat";
@@ -1039,32 +1041,112 @@
       document.getElementById("wins-white").textContent = String(sessionWins.white);
     }
 
+    function ownBaseCol(color) {
+      return color === "black" ? BLACK_BASE_COL : WHITE_BASE_COL;
+    }
+
+    /** 0 at own base → 6 at opponent base. */
+    function progressOf(color, col) {
+      return color === "black" ? col : SIZE - 1 - col;
+    }
+
+    function moveKeyAi(move) {
+      return `${move.dieId}@${move.toRow},${move.toCol}`;
+    }
+
     function chooseAiMove(gameState) {
       const color = "white";
       const moves = legalMoves(gameState, color);
       if (!moves.length) return null;
 
+      const mine = gameState.dice.filter((d) => d.color === color);
+      const minProg = Math.min(...mine.map((d) => progressOf(color, d.col)));
+      const home = ownBaseCol(color);
+
+      const advancing = moves.filter((m) => {
+        const die = dieById(gameState, m.dieId);
+        return progressOf(color, m.toCol) > progressOf(color, die.col);
+      });
+      // Never shuffle sideways if any die can step/jump forward.
+      const pool = advancing.length ? advancing : moves;
+
       let best = null;
       let bestScore = -Infinity;
-      for (const move of moves) {
+
+      for (const move of pool) {
         const die = dieById(gameState, move.dieId);
-        let score = move.finalTop * 4;
-        score += (SIZE - 1 - move.toCol) * 3;
+        const fromProg = progressOf(color, die.col);
+        const toProg = progressOf(color, move.toCol);
+        const gained = toProg - fromProg;
+
+        let score = gained * 50 + toProg * 10;
+
+        // Leave the starting column.
+        if (die.col === home && move.toCol !== home) score += 55;
+        if (move.toCol === home && gained <= 0) score -= 70;
+
+        // Pure sideways only when nothing advances — still discourage loops.
+        if (gained === 0) {
+          score -= 40;
+          if (move.finalTop > die.orient.top) {
+            score += (move.finalTop - die.orient.top) * 3;
+          } else if (move.finalTop < die.orient.top) {
+            score -= (die.orient.top - move.finalTop) * 6;
+          }
+        }
+
+        // Prefer stuck pieces in the rear.
+        if (fromProg === minProg) score += 22;
+        else if (fromProg === minProg + 1) score += 8;
+
         if (move.toCol === opponentBase(color)) {
-          score += 12 + move.finalTop * 2;
+          score += 45 + move.finalTop * 3;
         }
-        if (move.kind === "jump" && move.finalTop >= 5) score += 5;
-        if (move.kind === "tilt" && die && move.finalTop < die.orient.top) {
-          score -= (die.orient.top - move.finalTop) * 1.5;
+
+        // Face value matters more the farther you've come.
+        score += move.finalTop * (0.8 + toProg * 0.5);
+
+        if (gained > 0 && (move.kind === "jump" || move.kind === "tilt-jump")) {
+          score += 12 + Math.min(move.finalTop, 6);
         }
-        if (move.kind === "tilt" && move.finalTop >= 5) score += 3;
+
+        const key = moveKeyAi(move);
+        const hits = aiRecentKeys.filter((k) => k === key).length;
+        score -= hits * 90;
+
+        // Same die bouncing back to a square it just left.
+        const reverseKey = `${move.dieId}@${die.row},${die.col}`;
+        if (aiRecentKeys.includes(reverseKey)) score -= 120;
+
+        // Same die moved last turn without advancing — push variety.
+        if (
+          aiRecentKeys.length &&
+          aiRecentKeys[aiRecentKeys.length - 1].startsWith(`${move.dieId}@`) &&
+          gained === 0
+        ) {
+          score -= 50;
+        }
+
+        const othersStillHome = mine.filter(
+          (d) => d.id !== die.id && d.col === home
+        ).length;
+        score -= othersStillHome * 4;
+        if (move.toCol === home) score -= 8;
+
         score += Math.random() * 2;
+
         if (score > bestScore) {
           bestScore = score;
           best = move;
         }
       }
+
       return best;
+    }
+
+    function rememberAiMove(move) {
+      aiRecentKeys.push(moveKeyAi(move));
+      if (aiRecentKeys.length > 16) aiRecentKeys.shift();
     }
 
     function clearAiTimer() {
@@ -1086,6 +1168,7 @@
         }
         const move = chooseAiMove(state);
         if (!move) return;
+        rememberAiMove(move);
         commitLocalMove(move, { recordHistory: true, fromAi: true });
       }, 450);
     }
@@ -1571,6 +1654,7 @@
 
     function doRestart({ fromPeer } = {}) {
       clearAiTimer();
+      aiRecentKeys = [];
       state = createInitialState();
       history = [];
       selectedId = null;
