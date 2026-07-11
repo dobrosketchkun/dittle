@@ -421,6 +421,32 @@
 
     .you-are.is-visible { display: inline-flex; }
 
+    .match {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .match__label {
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+    }
+
+    .match__score {
+      font-family: "Fraunces", serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--cream);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
     .hint {
       font-size: 0.85rem;
       color: var(--muted);
@@ -512,6 +538,7 @@
     <div class="net" id="net">
       <div class="net__row">
         <button type="button" class="btn" id="btn-hotseat">Hotseat</button>
+        <button type="button" class="btn" id="btn-ai">vs AI</button>
         <button type="button" class="btn" id="btn-invite">Invite friend</button>
         <span class="you-are" id="you-are"></span>
       </div>
@@ -520,6 +547,17 @@
         <button type="button" class="btn" id="btn-copy">Copy link</button>
       </div>
       <p class="net__status" id="net-status" data-tone="wait"></p>
+    </div>
+
+    <div class="match" id="match" aria-live="polite">
+      <span class="match__label">Match</span>
+      <span class="match__score">
+        <span class="swatch swatch--black" aria-hidden="true"></span>
+        <span id="wins-black">0</span>
+        <span aria-hidden="true">–</span>
+        <span id="wins-white">0</span>
+        <span class="swatch swatch--white" aria-hidden="true"></span>
+      </span>
     </div>
 
     <header class="hud">
@@ -564,14 +602,15 @@
       <p class="overlay__body" id="overlay-body"></p>
       <div class="overlay__scores">
         <div>
-          <span class="score__label">Black</span>
+          <span class="score__label">Black face sum</span>
           <strong id="final-black">0</strong>
         </div>
         <div>
-          <span class="score__label">White</span>
+          <span class="score__label">White face sum</span>
           <strong id="final-white">0</strong>
         </div>
       </div>
+      <p class="overlay__body" id="overlay-match" style="margin-top:-0.5rem"></p>
       <button type="button" class="btn" id="btn-play-again">Play again</button>
     </div>
   </div>
@@ -953,8 +992,10 @@
     let history = [];
     let selectedId = null;
     let animating = false;
+    let sessionWins = { black: 0, white: 0 };
+    let aiTimer = null;
 
-    /** @type {'hotseat' | 'online'} */
+    /** @type {'hotseat' | 'online' | 'ai'} */
     let mode = "hotseat";
     /** @type {'host' | 'guest' | null} */
     let role = null;
@@ -974,12 +1015,80 @@
     const btnRestart = document.getElementById("btn-restart");
     const btnPlayAgain = document.getElementById("btn-play-again");
     const btnHotseat = document.getElementById("btn-hotseat");
+    const btnAi = document.getElementById("btn-ai");
     const btnInvite = document.getElementById("btn-invite");
     const btnCopy = document.getElementById("btn-copy");
     const inviteRow = document.getElementById("invite-row");
     const inviteUrlEl = document.getElementById("invite-url");
     const netStatusEl = document.getElementById("net-status");
     const youAreEl = document.getElementById("you-are");
+
+    function resetSessionWins() {
+      sessionWins = { black: 0, white: 0 };
+    }
+
+    function noteWinTransition(prevStatus, nextState) {
+      if (prevStatus !== "playing" || nextState.status !== "over") return;
+      if (nextState.winner === "black" || nextState.winner === "white") {
+        sessionWins[nextState.winner] += 1;
+      }
+    }
+
+    function renderMatchWins() {
+      document.getElementById("wins-black").textContent = String(sessionWins.black);
+      document.getElementById("wins-white").textContent = String(sessionWins.white);
+    }
+
+    function chooseAiMove(gameState) {
+      const color = "white";
+      const moves = legalMoves(gameState, color);
+      if (!moves.length) return null;
+
+      let best = null;
+      let bestScore = -Infinity;
+      for (const move of moves) {
+        const die = dieById(gameState, move.dieId);
+        let score = move.finalTop * 4;
+        score += (SIZE - 1 - move.toCol) * 3;
+        if (move.toCol === opponentBase(color)) {
+          score += 12 + move.finalTop * 2;
+        }
+        if (move.kind === "jump" && move.finalTop >= 5) score += 5;
+        if (move.kind === "tilt" && die && move.finalTop < die.orient.top) {
+          score -= (die.orient.top - move.finalTop) * 1.5;
+        }
+        if (move.kind === "tilt" && move.finalTop >= 5) score += 3;
+        score += Math.random() * 2;
+        if (score > bestScore) {
+          bestScore = score;
+          best = move;
+        }
+      }
+      return best;
+    }
+
+    function clearAiTimer() {
+      if (aiTimer != null) {
+        clearTimeout(aiTimer);
+        aiTimer = null;
+      }
+    }
+
+    function scheduleAiMove() {
+      clearAiTimer();
+      if (mode !== "ai" || state.status !== "playing" || state.turn !== "white") {
+        return;
+      }
+      aiTimer = setTimeout(() => {
+        aiTimer = null;
+        if (mode !== "ai" || state.status !== "playing" || state.turn !== "white") {
+          return;
+        }
+        const move = chooseAiMove(state);
+        if (!move) return;
+        commitLocalMove(move, { recordHistory: true, fromAi: true });
+      }, 450);
+    }
 
     function forwardFaceDir(color) {
       return forwardDir(color);
@@ -1031,8 +1140,13 @@
       return mode === "online";
     }
 
+    function isAi() {
+      return mode === "ai";
+    }
+
     function canAct() {
       if (state.status !== "playing" || animating) return false;
+      if (isAi()) return state.turn === "black";
       if (!isOnline()) return true;
       if (netStatus !== "connected") return false;
       if (pendingGuestMove) return false;
@@ -1050,6 +1164,16 @@
     }
 
     function updateYouAre() {
+      if (isAi()) {
+        youAreEl.classList.add("is-visible");
+        youAreEl.replaceChildren();
+        const swatch = document.createElement("span");
+        swatch.className = "swatch swatch--black";
+        swatch.setAttribute("aria-hidden", "true");
+        youAreEl.appendChild(swatch);
+        youAreEl.appendChild(document.createTextNode("You are Black · AI is White"));
+        return;
+      }
       if (!isOnline() || !myColor) {
         youAreEl.classList.remove("is-visible");
         youAreEl.replaceChildren();
@@ -1069,9 +1193,14 @@
     }
 
     function updateModeButtons() {
-      btnHotseat.disabled = isOnline() && netStatus === "connected";
-      btnInvite.disabled =
-        isOnline() && (netStatus === "hosting" || netStatus === "connected" || netStatus === "connecting");
+      const busyOnline =
+        isOnline() &&
+        (netStatus === "hosting" ||
+          netStatus === "connected" ||
+          netStatus === "connecting");
+      btnHotseat.disabled = busyOnline;
+      btnAi.disabled = busyOnline;
+      btnInvite.disabled = busyOnline;
       btnUndo.disabled =
         isOnline() || history.length === 0 || animating || state.status === "over";
       if (isOnline()) {
@@ -1163,6 +1292,7 @@
 
       updateYouAre();
       updateModeButtons();
+      renderMatchWins();
     }
 
     function updateHint() {
@@ -1193,6 +1323,11 @@
         return;
       }
 
+      if (isAi() && state.turn === "white") {
+        hintEl.innerHTML = "AI is thinking…";
+        return;
+      }
+
       if (isOnline() && !canAct()) {
         hintEl.innerHTML = `Online — waiting for <strong>${
           state.turn === "black" ? "Black" : "White"
@@ -1200,16 +1335,17 @@
         return;
       }
 
+      const modeLabel = isOnline() ? "Online" : isAi() ? "vs AI" : "Hotseat";
       const who = isOnline()
         ? `You (${myColor === "black" ? "Black" : "White"})`
-        : state.turn === "black"
-          ? "Black"
-          : "White";
+        : isAi()
+          ? "You (Black)"
+          : state.turn === "black"
+            ? "Black"
+            : "White";
 
       if (!selectedId) {
-        hintEl.innerHTML = `${
-          isOnline() ? "Online" : "Hotseat"
-        } — <strong>${who}</strong>: select one of your dice.`;
+        hintEl.innerHTML = `${modeLabel} — <strong>${who}</strong>: select one of your dice.`;
         return;
       }
       const n = movesForSelection().length;
@@ -1235,6 +1371,8 @@
       }
       document.getElementById("overlay-title").textContent = title;
       document.getElementById("overlay-body").textContent = body;
+      document.getElementById("overlay-match").textContent =
+        `Match: Black ${sessionWins.black} – White ${sessionWins.white}`;
       overlayEl.classList.add("is-open");
       overlayEl.setAttribute("aria-hidden", "false");
     }
@@ -1290,11 +1428,13 @@
       };
     }
 
-    function applyStateFromHost(nextState, lastMove) {
+    function applyStateFromHost(nextState, lastMove, wins) {
       selectedId = null;
       pendingGuestMove = false;
       history = [];
-      const prev = cloneState(state);
+      if (wins && typeof wins.black === "number" && typeof wins.white === "number") {
+        sessionWins = { black: wins.black, white: wins.white };
+      }
       state = cloneState(nextState);
       turnIndex += 1;
 
@@ -1320,7 +1460,6 @@
         animating = false;
         render();
       }
-      void prev;
     }
 
     function broadcastState(lastMove) {
@@ -1330,6 +1469,7 @@
         turn: turnIndex,
         state: cloneState(state),
         lastMove: lastMove ? serializeMove(lastMove) : null,
+        wins: { ...sessionWins },
       });
     }
 
@@ -1338,6 +1478,7 @@
       const result = applyMove(state, move);
       if (!result.ok) return false;
 
+      noteWinTransition(before.status, result.state);
       if (recordHistory) history.push(before);
       selectedId = null;
       animating = true;
@@ -1361,6 +1502,7 @@
       setTimeout(() => {
         animating = false;
         render();
+        scheduleAiMove();
       }, 320);
 
       return true;
@@ -1392,12 +1534,14 @@
         broadcastState(null);
         return;
       }
+      const beforeStatus = state.status;
       const result = applyMove(state, move);
       if (!result.ok) {
         conn?.send({ type: "error", message: result.error || "Illegal move" });
         broadcastState(null);
         return;
       }
+      noteWinTransition(beforeStatus, result.state);
       selectedId = null;
       animating = true;
       state = result.state;
@@ -1426,6 +1570,7 @@
     }
 
     function doRestart({ fromPeer } = {}) {
+      clearAiTimer();
       state = createInitialState();
       history = [];
       selectedId = null;
@@ -1441,8 +1586,10 @@
           youAre: "white",
           first: "black",
           state: cloneState(state),
+          wins: { ...sessionWins },
         });
       }
+      if (isAi()) scheduleAiMove();
       void fromPeer;
     }
 
@@ -1463,7 +1610,11 @@
 
     function undo() {
       if (isOnline() || !history.length || animating) return;
+      clearAiTimer();
       state = history.pop();
+      if (isAi() && state.turn === "white" && history.length) {
+        state = history.pop();
+      }
       selectedId = null;
       render();
     }
@@ -1512,6 +1663,7 @@
             youAre: "white",
             first: "black",
             state: cloneState(state),
+            wins: { ...sessionWins },
           });
           render();
         } else {
@@ -1554,7 +1706,7 @@
 
       if (data.type === "start" && role === "guest") {
         myColor = data.youAre || "white";
-        applyStateFromHost(data.state, null);
+        applyStateFromHost(data.state, null, data.wins);
         netStatus = "connected";
         setNetStatus("Connected — you are White. Host is Black.", "ok");
         updateYouAre();
@@ -1562,7 +1714,7 @@
       }
 
       if (data.type === "state" && role === "guest") {
-        applyStateFromHost(data.state, data.lastMove);
+        applyStateFromHost(data.state, data.lastMove, data.wins);
         setNetStatus("Connected", "ok");
         return;
       }
@@ -1587,10 +1739,12 @@
 
     function startHosting() {
       destroyPeer();
+      clearAiTimer();
       mode = "online";
       role = "host";
       myColor = "black";
       netStatus = "hosting";
+      resetSessionWins();
       state = createInitialState();
       history = [];
       selectedId = null;
@@ -1627,10 +1781,12 @@
 
     function startGuest(hostId) {
       destroyPeer();
+      clearAiTimer();
       mode = "online";
       role = "guest";
       myColor = "white";
       netStatus = "connecting";
+      resetSessionWins();
       pendingGuestMove = false;
       inviteRow.classList.remove("is-visible");
       setNetStatus(`Joining ${hostId}…`, "wait");
@@ -1653,11 +1809,32 @@
 
     function goHotseat() {
       destroyPeer();
+      clearAiTimer();
       mode = "hotseat";
       role = null;
       myColor = null;
       netStatus = "idle";
       pendingGuestMove = false;
+      resetSessionWins();
+      inviteRow.classList.remove("is-visible");
+      const url = new URL(location.href);
+      url.search = "";
+      window.history.replaceState(null, "", url.pathname + url.hash);
+      setNetStatus("");
+      doRestart();
+      updateYouAre();
+      updateModeButtons();
+    }
+
+    function goAi() {
+      destroyPeer();
+      clearAiTimer();
+      mode = "ai";
+      role = null;
+      myColor = "black";
+      netStatus = "idle";
+      pendingGuestMove = false;
+      resetSessionWins();
       inviteRow.classList.remove("is-visible");
       const url = new URL(location.href);
       url.search = "";
@@ -1672,6 +1849,7 @@
     btnRestart.addEventListener("click", restart);
     btnPlayAgain.addEventListener("click", restart);
     btnHotseat.addEventListener("click", goHotseat);
+    btnAi.addEventListener("click", goAi);
     btnInvite.addEventListener("click", startHosting);
     btnCopy.addEventListener("click", async () => {
       const text = inviteUrlEl.value;
@@ -1701,7 +1879,7 @@
       createInitialState,
       tiltOrient,
       SIZE,
-      getNet: () => ({ mode, role, myColor, netStatus }),
+      getNet: () => ({ mode, role, myColor, netStatus, sessionWins }),
     };
   </script>
 </body>
