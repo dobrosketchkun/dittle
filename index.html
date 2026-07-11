@@ -458,6 +458,122 @@
 
     .hint strong { color: var(--accent); font-weight: 600; }
 
+    .foot {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      align-items: start;
+    }
+
+    .foot .hint {
+      text-align: left;
+      max-width: none;
+      min-height: 0;
+    }
+
+    .btn-help {
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border-radius: 50%;
+      font-family: "Fraunces", serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    .rules-overlay .overlay__card {
+      width: min(100%, 28rem);
+      max-height: min(86dvh, 40rem);
+      padding: 0;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .rules__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 1.1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid rgba(201, 166, 107, 0.2);
+      flex-shrink: 0;
+    }
+
+    .rules__head h2 {
+      font-family: "Fraunces", serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .rules__close {
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border-radius: 0.3rem;
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+
+    .rules__body {
+      overflow-y: auto;
+      padding: 1rem 1.25rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .rules__section h3 {
+      font-family: "Fraunces", serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0 0 0.4rem;
+      color: var(--accent);
+    }
+
+    .rules__section p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .rules__section ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1.1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .rules__fig {
+      margin-top: 0.65rem;
+      padding: 0.75rem;
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: 0.35rem;
+      border: 1px solid rgba(201, 166, 107, 0.18);
+    }
+
+    .rules__fig svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .rules__caption {
+      margin-top: 0.45rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
     .overlay {
       position: fixed;
       inset: 0;
@@ -530,6 +646,8 @@
       .board { gap: 0.22rem; padding: 0.3rem; }
       .hud { gap: 0.4rem; }
       .score__value { font-size: 1.4rem; }
+      .foot { gap: 0.5rem; }
+      .foot .hint { font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -590,10 +708,13 @@
       <button type="button" class="btn" id="btn-restart">Restart</button>
     </div>
 
-    <p class="hint" id="hint">
-      Hotseat — select a die, then a highlighted square.
-      <strong>Tilt</strong> changes the top face; <strong>jumps</strong> keep it.
-    </p>
+    <div class="foot">
+      <p class="hint" id="hint">
+        Hotseat — select a die, then a highlighted square.
+        <strong>Tilt</strong> changes the top face; <strong>jumps</strong> keep it.
+      </p>
+      <button type="button" class="btn btn-help" id="btn-help" aria-label="How to play" title="How to play">?</button>
+    </div>
   </div>
 
   <div class="overlay" id="overlay" aria-hidden="true">
@@ -612,6 +733,136 @@
       </div>
       <p class="overlay__body" id="overlay-match" style="margin-top:-0.5rem"></p>
       <button type="button" class="btn" id="btn-play-again">Play again</button>
+    </div>
+  </div>
+
+  <div class="overlay rules-overlay" id="rules-overlay" aria-hidden="true">
+    <div class="overlay__card" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+      <div class="rules__head">
+        <h2 id="rules-title">How to play</h2>
+        <button type="button" class="btn rules__close" id="btn-rules-close" aria-label="Close">×</button>
+      </div>
+      <div class="rules__body">
+        <section class="rules__section">
+          <h3>Goal</h3>
+          <p>
+            Move all seven of your dice into the opponent’s base column.
+            When someone finishes, both players add up the <strong>face-up</strong> numbers
+            of their dice in the opponent’s base — highest sum wins.
+          </p>
+        </section>
+
+        <section class="rules__section">
+          <h3>Setup</h3>
+          <p>
+            Black starts on the left, white on the right. Every die shows
+            <strong>6</strong> on top and <strong>4</strong> toward the opponent.
+          </p>
+          <div class="rules__fig" aria-hidden="true">
+            <svg viewBox="0 0 280 100" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="4" width="272" height="64" rx="6" fill="#2a1810" stroke="#6b4428"/>
+              <g fill="#1a1a1a" stroke="#cfcfcf" stroke-width="0.6">
+                <rect x="22" y="12" width="14" height="14" rx="3"/>
+                <rect x="22" y="29" width="14" height="14" rx="3"/>
+                <rect x="22" y="46" width="14" height="14" rx="3"/>
+              </g>
+              <g fill="#f7f4ef" stroke="#222" stroke-width="0.6">
+                <rect x="244" y="12" width="14" height="14" rx="3"/>
+                <rect x="244" y="29" width="14" height="14" rx="3"/>
+                <rect x="244" y="46" width="14" height="14" rx="3"/>
+              </g>
+              <path d="M52 35 H216" stroke="#c9a66b" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <polygon points="224,35 214,30 214,40" fill="#c9a66b"/>
+              <text x="29" y="88" text-anchor="middle" fill="#c4b5a4" font-size="11" font-family="Source Sans 3, sans-serif">Black base</text>
+              <text x="251" y="88" text-anchor="middle" fill="#c4b5a4" font-size="11" font-family="Source Sans 3, sans-serif">White base</text>
+            </svg>
+            <p class="rules__caption">Advance toward the opposite base</p>
+          </div>
+        </section>
+
+        <section class="rules__section">
+          <h3>Moves</h3>
+          <p>One move per turn. No backward. No diagonal. No spinning in place.</p>
+          <ul>
+            <li><strong>Tilt</strong> — tip one step forward or sideways onto an empty square (top face changes).</li>
+            <li><strong>Jump</strong> — leap over one or more dice in a straight line onto an empty square (top face stays).</li>
+            <li><strong>Tilt + jump</strong> — tip once, then jump (including multi-jumps / L-shapes).</li>
+          </ul>
+          <div class="rules__fig" aria-hidden="true">
+            <svg viewBox="0 0 280 120" xmlns="http://www.w3.org/2000/svg">
+              <text x="8" y="16" fill="#c9a66b" font-size="11" font-family="Fraunces, serif">Tilt (forward)</text>
+              <!-- 6: two columns of three -->
+              <rect x="20" y="28" width="28" height="28" rx="4" fill="#1a1a1a"/>
+              <circle cx="28" cy="35" r="2.2" fill="#eee"/>
+              <circle cx="40" cy="35" r="2.2" fill="#eee"/>
+              <circle cx="28" cy="42" r="2.2" fill="#eee"/>
+              <circle cx="40" cy="42" r="2.2" fill="#eee"/>
+              <circle cx="28" cy="49" r="2.2" fill="#eee"/>
+              <circle cx="40" cy="49" r="2.2" fill="#eee"/>
+              <path d="M54 42 H78" stroke="#7ec8a0" stroke-width="2"/>
+              <polygon points="78,42 70,38 70,46" fill="#7ec8a0"/>
+              <!-- 4: four corners -->
+              <rect x="84" y="28" width="28" height="28" rx="4" fill="#1a1a1a" opacity="0.9"/>
+              <circle cx="92" cy="36" r="2.2" fill="#eee"/>
+              <circle cx="104" cy="36" r="2.2" fill="#eee"/>
+              <circle cx="92" cy="48" r="2.2" fill="#eee"/>
+              <circle cx="104" cy="48" r="2.2" fill="#eee"/>
+              <text x="124" y="46" fill="#c4b5a4" font-size="10" font-family="Source Sans 3, sans-serif">6 → 4</text>
+
+              <text x="8" y="78" fill="#c9a66b" font-size="11" font-family="Fraunces, serif">Jump</text>
+              <rect x="20" y="88" width="24" height="24" rx="3" fill="#1a1a1a"/>
+              <rect x="56" y="88" width="24" height="24" rx="3" fill="#f7f4ef"/>
+              <rect x="92" y="88" width="24" height="24" rx="3" fill="none" stroke="#7ec8a0" stroke-width="2" stroke-dasharray="3 2"/>
+              <path d="M44 100 Q70 78 92 100" fill="none" stroke="#7ec8a0" stroke-width="2"/>
+              <text x="126" y="104" fill="#c4b5a4" font-size="10" font-family="Source Sans 3, sans-serif">face unchanged</text>
+            </svg>
+            <p class="rules__caption">Ghost previews show the top face after your move</p>
+          </div>
+        </section>
+
+        <section class="rules__section">
+          <h3>Jump details</h3>
+          <ul>
+            <li>You may jump your own or opponent dice.</li>
+            <li>Landing square must be empty.</li>
+            <li>Jumping several dice needs a gap between them — no leaping a tight cluster.</li>
+          </ul>
+        </section>
+
+        <section class="rules__section">
+          <h3>Scoring</h3>
+          <p>
+            Finishing first is not an automatic win. After the game ends, compare face sums
+            in each opponent’s base. You can keep tilting dice already in the base to raise their numbers.
+          </p>
+          <div class="rules__fig" aria-hidden="true">
+            <svg viewBox="0 0 280 150" xmlns="http://www.w3.org/2000/svg">
+              <text x="140" y="16" text-anchor="middle" fill="#c4b5a4" font-size="11" font-family="Source Sans 3, sans-serif">In opponent base</text>
+              <g transform="translate(129,28)">
+                <rect width="22" height="22" rx="3" fill="#1a1a1a"/>
+                <text x="11" y="15" text-anchor="middle" fill="#eee" font-size="12" font-family="Fraunces, serif">6</text>
+                <text x="11" y="34" text-anchor="middle" fill="#c9a66b" font-size="12" font-family="Fraunces, serif">+</text>
+                <rect y="38" width="22" height="22" rx="3" fill="#1a1a1a"/>
+                <text x="11" y="53" text-anchor="middle" fill="#eee" font-size="12" font-family="Fraunces, serif">5</text>
+                <text x="11" y="72" text-anchor="middle" fill="#c9a66b" font-size="12" font-family="Fraunces, serif">+</text>
+                <rect y="76" width="22" height="22" rx="3" fill="#1a1a1a"/>
+                <text x="11" y="91" text-anchor="middle" fill="#eee" font-size="12" font-family="Fraunces, serif">4</text>
+              </g>
+              <line x1="118" y1="130" x2="162" y2="130" stroke="#6b4428" stroke-width="1.5"/>
+              <text x="140" y="146" text-anchor="middle" fill="#c9a66b" font-size="13" font-family="Fraunces, serif">= 15 · highest total wins</text>
+            </svg>
+          </div>
+        </section>
+
+        <section class="rules__section">
+          <h3>Modes</h3>
+          <ul>
+            <li><strong>Hotseat</strong> — both colors on one device.</li>
+            <li><strong>vs AI</strong> — you play Black; AI plays White.</li>
+            <li><strong>Invite friend</strong> — share the link; host is Black, guest is White.</li>
+          </ul>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -1020,10 +1271,24 @@
     const btnAi = document.getElementById("btn-ai");
     const btnInvite = document.getElementById("btn-invite");
     const btnCopy = document.getElementById("btn-copy");
+    const btnHelp = document.getElementById("btn-help");
+    const btnRulesClose = document.getElementById("btn-rules-close");
+    const rulesOverlay = document.getElementById("rules-overlay");
     const inviteRow = document.getElementById("invite-row");
     const inviteUrlEl = document.getElementById("invite-url");
     const netStatusEl = document.getElementById("net-status");
     const youAreEl = document.getElementById("you-are");
+
+    function openRules() {
+      rulesOverlay.classList.add("is-open");
+      rulesOverlay.setAttribute("aria-hidden", "false");
+      btnRulesClose.focus();
+    }
+
+    function closeRules() {
+      rulesOverlay.classList.remove("is-open");
+      rulesOverlay.setAttribute("aria-hidden", "true");
+    }
 
     function resetSessionWins() {
       sessionWins = { black: 0, white: 0 };
@@ -1935,6 +2200,16 @@
     btnHotseat.addEventListener("click", goHotseat);
     btnAi.addEventListener("click", goAi);
     btnInvite.addEventListener("click", startHosting);
+    btnHelp.addEventListener("click", openRules);
+    btnRulesClose.addEventListener("click", closeRules);
+    rulesOverlay.addEventListener("click", (e) => {
+      if (e.target === rulesOverlay) closeRules();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && rulesOverlay.classList.contains("is-open")) {
+        closeRules();
+      }
+    });
     btnCopy.addEventListener("click", async () => {
       const text = inviteUrlEl.value;
       if (!text) return;
