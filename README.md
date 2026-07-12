@@ -2,6 +2,7 @@
 
 A browser port of **Dittle – Dice Battle**: a two-player strategy game where you tilt and jump dice across a wooden 7×7 board. Getting all seven of your dice into the opponent’s base ends the game — but the **higher face-up sum** wins, so speed alone is not enough.
 
+Play here - https://dobrosketchkun.github.io/dittle/
 
 ![Dittle gameplay screenshot](misc/screenshot.jpg)
 
